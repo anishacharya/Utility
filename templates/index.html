@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Converter - Utility Suite</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-tools"></i> Utility Suite</h1>
+            <h2>Image Converter</h2>
+        </header>
+
+        <main>
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-image"></i> Convert Your Image</h3>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages() %}
+                        {% if messages %}
+                            <div class="alert">
+                                <ul>
+                                    {% for message in messages %}
+                                        <li>{{ message }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+
+                    <form action="{{ url_for('convert') }}" method="post" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="file">
+                                <i class="fas fa-upload"></i> Select Image
+                            </label>
+                            <div class="file-input-container">
+                                <input type="file" id="file" name="file" accept=".heic,.jpg,.jpeg,.png,.bmp,.tiff,.gif" required>
+                                <div class="file-preview" id="file-preview">
+                                    <p>No file selected</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="output_format">
+                                <i class="fas fa-file-export"></i> Output Format
+                            </label>
+                            <select id="output_format" name="output_format" required>
+                                {% for format_key, format_name in output_formats.items() %}
+                                    <option value="{{ format_key }}">{{ format_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn">
+                                <i class="fas fa-sync-alt"></i> Convert Image
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3><i class="fas fa-info-circle"></i> Supported Formats</h3>
+                <div class="format-info">
+                    <div>
+                        <h4>Input Formats</h4>
+                        <ul>
+                            <li>HEIC (iPhone photos)</li>
+                            <li>JPG/JPEG</li>
+                            <li>PNG</li>
+                            <li>BMP</li>
+                            <li>TIFF</li>
+                            <li>GIF</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4>Output Formats</h4>
+                        <ul>
+                            <li>JPG/JPEG</li>
+                            <li>PNG</li>
+                            <li>BMP</li>
+                            <li>TIFF</li>
+                            <li>GIF</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2023 Utility Suite. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Display file name when selected
+        document.getElementById('file').addEventListener('change', function(e) {
+            const fileName = e.target.files[0]?.name || 'No file selected';
+            const filePreview = document.getElementById('file-preview');
+            
+            if (e.target.files[0]) {
+                // If it's an image, show a preview
+                if (e.target.files[0].type.startsWith('image/') || 
+                    e.target.files[0].name.toLowerCase().endsWith('.heic')) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        filePreview.innerHTML = `
+                            <p>${fileName}</p>
+                            ${e.target.files[0].type.startsWith('image/') ? 
+                              `<img src="${event.target.result}" alt="Preview">` : 
+                              '<p class="heic-note">HEIC preview not available</p>'}
+                        `;
+                    };
+                    reader.readAsDataURL(e.target.files[0]);
+                } else {
+                    filePreview.innerHTML = `<p>${fileName}</p>`;
+                }
+            } else {
+                filePreview.innerHTML = `<p>${fileName}</p>`;
+            }
+        });
+    </script>
+</body>
+</html> 
