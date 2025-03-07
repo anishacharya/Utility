@@ -13,6 +13,7 @@ A robust tool to convert images across various formats, with special support for
 - Available as both CLI and web interface
 - Preserves image quality during conversion
 - Handles transparency correctly when converting to formats without alpha channel support
+- Simple, intuitive web UI for easy image conversion
 
 ### Supported Formats
 
@@ -30,24 +31,15 @@ A robust tool to convert images across various formats, with special support for
 
 #### Python Dependencies
 
+Install all required dependencies:
+
 ```bash
-pip install pillow pillow-heif flask
+pip install -r requirements.txt
 ```
 
 ### Usage
 
-#### Command Line Interface
-
-```bash
-python img_converter.py --input <input_image_path> --output <output_image_path>
-```
-
-Example:
-```bash
-python img_converter.py --input photo.heic --output photo.jpg
-```
-
-#### Web Interface
+#### Web Interface (Recommended)
 
 Start the web server:
 
@@ -65,12 +57,36 @@ The web interface allows you to:
 2. Select the desired output format
 3. Convert and download the converted image
 
+![Web Interface Screenshot](https://via.placeholder.com/800x450.png?text=Image+Converter+Web+UI)
+
+#### Command Line Interface
+
+For batch processing or automation, you can use the CLI:
+
+```bash
+python img_converter.py --input <input_image_path> --output <output_image_path>
+```
+
+Example:
+```bash
+python img_converter.py --input photo.heic --output photo.jpg
+```
+
 ## Project Structure
 
 - `img_converter.py` - Core image conversion functionality
 - `app.py` - Web server for the UI interface
 - `templates/` - HTML templates for the web interface
 - `static/` - CSS, JavaScript, and other static assets
+- `uploads/` - Temporary storage for uploaded images (auto-created)
+- `converted/` - Temporary storage for converted images (auto-created)
+
+## Future Enhancements
+
+- Batch conversion support
+- Image resizing and optimization options
+- Additional image formats
+- Dark mode UI
 
 ## License
 
