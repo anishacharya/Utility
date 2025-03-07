@@ -100,4 +100,5 @@ def request_entity_too_large(error):
     return redirect(url_for('index')), 413
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    # Make the server accessible from any device on the network
+    app.run(debug=True, host='0.0.0.0', port=5000) 
