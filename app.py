@@ -8,7 +8,8 @@ select output formats, and download the converted images.
 
 import os
 import uuid
-from flask import Flask, render_template, request, send_file, redirect, url_for, flash
+import time
+from flask import Flask, render_template, request, send_file, redirect, url_for, flash, jsonify
 from werkzeug.utils import secure_filename
 from img_converter import convert_image
 
@@ -27,21 +28,24 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['OUTPUT_FOLDER'] = OUTPUT_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32MB max upload size
 
 def allowed_file(filename):
+    """Check if the file has an allowed extension"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route('/')
 def index():
+    """Render the main page"""
     return render_template('index.html', output_formats=OUTPUT_FORMATS)
 
 @app.route('/convert', methods=['POST'])
 def convert():
+    """Handle image conversion"""
     # Check if the post request has the file part
     if 'file' not in request.files:
         flash('No file part')
-        return redirect(request.url)
+        return redirect(url_for('index'))
     
     file = request.files['file']
     
@@ -49,36 +53,45 @@ def convert():
     # submit an empty part without filename
     if file.filename == '':
         flash('No selected file')
-        return redirect(request.url)
+        return redirect(url_for('index'))
     
     if file and allowed_file(file.filename):
-        # Generate unique filenames
-        original_extension = os.path.splitext(file.filename)[1].lower()
-        unique_id = str(uuid.uuid4())
-        
-        # Secure the filename
-        secure_name = secure_filename(file.filename)
-        base_name = os.path.splitext(secure_name)[0]
-        
-        # Save the uploaded file
-        input_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{base_name}_{unique_id}{original_extension}")
-        file.save(input_path)
-        
-        # Get the output format
-        output_format = request.form.get('output_format', 'jpg')
-        if output_format not in OUTPUT_FORMATS:
-            output_format = 'jpg'  # Default to jpg if invalid format
-        
-        # Create output path
-        output_path = os.path.join(app.config['OUTPUT_FOLDER'], f"{base_name}_{unique_id}.{output_format}")
-        
         try:
+            # Generate unique filenames
+            original_extension = os.path.splitext(file.filename)[1].lower()
+            unique_id = str(uuid.uuid4())
+            
+            # Secure the filename
+            secure_name = secure_filename(file.filename)
+            base_name = os.path.splitext(secure_name)[0]
+            
+            # Save the uploaded file
+            input_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{base_name}_{unique_id}{original_extension}")
+            file.save(input_path)
+            
+            # Get the output format
+            output_format = request.form.get('output_format', 'jpg')
+            if output_format not in OUTPUT_FORMATS:
+                output_format = 'jpg'  # Default to jpg if invalid format
+            
+            # Create output path
+            output_path = os.path.join(app.config['OUTPUT_FOLDER'], f"{base_name}_{unique_id}.{output_format}")
+            
+            # Add a small delay to ensure file is saved properly
+            time.sleep(0.5)
+            
             # Convert the image
             convert_image(input_path, output_path)
             
             # Return the converted file for download
-            return send_file(output_path, as_attachment=True, download_name=f"{base_name}.{output_format}")
+            return send_file(
+                output_path, 
+                as_attachment=True, 
+                download_name=f"{base_name}.{output_format}",
+                mimetype=f"image/{output_format}"
+            )
         except Exception as e:
+            app.logger.error(f"Error converting image: {str(e)}")
             flash(f"Error converting image: {str(e)}")
             return redirect(url_for('index'))
         finally:
@@ -88,16 +101,29 @@ def convert():
                     os.remove(input_path)
                 if os.path.exists(output_path):
                     os.remove(output_path)
-            except:
+            except Exception as e:
+                app.logger.error(f"Error cleaning up files: {str(e)}")
                 pass  # Ignore cleanup errors
     else:
-        flash('File type not allowed')
+        flash('File type not allowed. Supported formats: HEIC, JPG, JPEG, PNG, BMP, TIFF, GIF')
         return redirect(url_for('index'))
 
 @app.errorhandler(413)
 def request_entity_too_large(error):
-    flash('File too large (max 16MB)')
+    """Handle file too large error"""
+    flash('File too large (max 32MB)')
     return redirect(url_for('index')), 413
+
+@app.errorhandler(404)
+def page_not_found(error):
+    """Handle 404 errors"""
+    return render_template('index.html', output_formats=OUTPUT_FORMATS, error="Page not found"), 404
+
+@app.errorhandler(500)
+def server_error(error):
+    """Handle 500 errors"""
+    app.logger.error(f"Server error: {str(error)}")
+    return render_template('index.html', output_formats=OUTPUT_FORMATS, error="Server error occurred. Please try again."), 500
 
 if __name__ == '__main__':
     # Make the server accessible from any device on the network

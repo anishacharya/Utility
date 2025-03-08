@@ -32,12 +32,16 @@
                         {% endif %}
                     {% endwith %}
 
-                    <form action="{{ url_for('convert') }}" method="post" enctype="multipart/form-data">
+                    <form action="{{ url_for('convert') }}" method="post" enctype="multipart/form-data" id="conversion-form">
                         <div class="form-group">
                             <label for="file">
                                 <i class="fas fa-upload"></i> Select Image
                             </label>
-                            <div class="file-input-container">
+                            <div class="file-input-container" id="drop-area">
+                                <div class="file-input-prompt">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <p>Drag & drop your image here or click to browse</p>
+                                </div>
                                 <input type="file" id="file" name="file" accept=".heic,.jpg,.jpeg,.png,.bmp,.tiff,.gif" required>
                                 <div class="file-preview" id="file-preview">
                                     <p>No file selected</p>
@@ -57,11 +61,24 @@
                         </div>
 
                         <div class="form-group">
-                            <button type="submit" class="btn">
+                            <button type="submit" class="btn" id="convert-btn">
                                 <i class="fas fa-sync-alt"></i> Convert Image
                             </button>
                         </div>
                     </form>
+                    
+                    <div id="loading" class="loading-container hidden">
+                        <div class="loading-spinner"></div>
+                        <p id="loading-text">Converting your image...</p>
+                    </div>
+                    
+                    <div id="success-message" class="success-message hidden">
+                        <i class="fas fa-check-circle success-icon"></i>
+                        <p>Conversion complete! Your download should start automatically.</p>
+                        <button id="reset-btn" class="btn reset-btn">
+                            <i class="fas fa-redo"></i> Convert Another Image
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -71,22 +88,22 @@
                     <div>
                         <h4>Input Formats</h4>
                         <ul>
-                            <li>HEIC (iPhone photos)</li>
-                            <li>JPG/JPEG</li>
-                            <li>PNG</li>
-                            <li>BMP</li>
-                            <li>TIFF</li>
-                            <li>GIF</li>
+                            <li><i class="fas fa-file-image"></i> HEIC (iPhone photos)</li>
+                            <li><i class="fas fa-file-image"></i> JPG/JPEG</li>
+                            <li><i class="fas fa-file-image"></i> PNG</li>
+                            <li><i class="fas fa-file-image"></i> BMP</li>
+                            <li><i class="fas fa-file-image"></i> TIFF</li>
+                            <li><i class="fas fa-file-image"></i> GIF</li>
                         </ul>
                     </div>
                     <div>
                         <h4>Output Formats</h4>
                         <ul>
-                            <li>JPG/JPEG</li>
-                            <li>PNG</li>
-                            <li>BMP</li>
-                            <li>TIFF</li>
-                            <li>GIF</li>
+                            <li><i class="fas fa-file-export"></i> JPG/JPEG</li>
+                            <li><i class="fas fa-file-export"></i> PNG</li>
+                            <li><i class="fas fa-file-export"></i> BMP</li>
+                            <li><i class="fas fa-file-export"></i> TIFF</li>
+                            <li><i class="fas fa-file-export"></i> GIF</li>
                         </ul>
                     </div>
                 </div>
@@ -99,31 +116,185 @@
     </div>
 
     <script>
-        // Display file name when selected
-        document.getElementById('file').addEventListener('change', function(e) {
-            const fileName = e.target.files[0]?.name || 'No file selected';
-            const filePreview = document.getElementById('file-preview');
+        // Drag and drop functionality
+        const dropArea = document.getElementById('drop-area');
+        const fileInput = document.getElementById('file');
+        const conversionForm = document.getElementById('conversion-form');
+        const loadingContainer = document.getElementById('loading');
+        const loadingText = document.getElementById('loading-text');
+        const convertBtn = document.getElementById('convert-btn');
+        const successMessage = document.getElementById('success-message');
+        const resetBtn = document.getElementById('reset-btn');
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+        
+        function highlight() {
+            dropArea.classList.add('highlight');
+        }
+        
+        function unhighlight() {
+            dropArea.classList.remove('highlight');
+        }
+        
+        dropArea.addEventListener('drop', handleDrop, false);
+        
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            fileInput.files = files;
             
-            if (e.target.files[0]) {
-                // If it's an image, show a preview
-                if (e.target.files[0].type.startsWith('image/') || 
-                    e.target.files[0].name.toLowerCase().endsWith('.heic')) {
+            // Trigger the change event
+            const event = new Event('change');
+            fileInput.dispatchEvent(event);
+        }
+        
+        // Make the entire drop area clickable to trigger file input
+        dropArea.addEventListener('click', function() {
+            fileInput.click();
+        });
+        
+        // Display file name and preview when selected
+        document.getElementById('file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const fileName = file?.name || 'No file selected';
+            const filePreview = document.getElementById('file-preview');
+            const fileInputPrompt = document.querySelector('.file-input-prompt');
+            
+            // Reset the UI state
+            successMessage.classList.add('hidden');
+            convertBtn.disabled = false;
+            
+            if (fileInputPrompt) {
+                fileInputPrompt.style.display = 'none';
+            }
+            
+            if (file) {
+                // Check if it's a HEIC file first
+                if (fileName.toLowerCase().endsWith('.heic')) {
+                    // For HEIC files, show a placeholder immediately
+                    filePreview.innerHTML = `
+                        <p class="file-name">${fileName}</p>
+                        <div class="heic-preview">
+                            <i class="fas fa-file-image heic-icon"></i>
+                            <p class="heic-note">HEIC preview not available in browser</p>
+                            <p class="heic-note">File will be converted as requested</p>
+                        </div>
+                    `;
+                } 
+                // If it's a standard web image format
+                else if (file.type.startsWith('image/')) {
+                    // Show file info first
+                    filePreview.innerHTML = `<p class="file-name">${fileName}</p>`;
+                    
+                    // Then add the image preview
                     const reader = new FileReader();
                     reader.onload = function(event) {
-                        filePreview.innerHTML = `
-                            <p>${fileName}</p>
-                            ${e.target.files[0].type.startsWith('image/') ? 
-                              `<img src="${event.target.result}" alt="Preview">` : 
-                              '<p class="heic-note">HEIC preview not available</p>'}
-                        `;
+                        const img = document.createElement('img');
+                        img.src = event.target.result;
+                        img.alt = 'Preview';
+                        img.className = 'preview-image';
+                        filePreview.appendChild(img);
                     };
-                    reader.readAsDataURL(e.target.files[0]);
-                } else {
-                    filePreview.innerHTML = `<p>${fileName}</p>`;
+                    reader.readAsDataURL(file);
+                } 
+                // For other accepted formats that might not have preview
+                else {
+                    filePreview.innerHTML = `
+                        <p class="file-name">${fileName}</p>
+                        <div class="heic-preview">
+                            <i class="fas fa-file-image heic-icon"></i>
+                            <p class="heic-note">Preview not available for this format</p>
+                        </div>
+                    `;
                 }
             } else {
-                filePreview.innerHTML = `<p>${fileName}</p>`;
+                if (fileInputPrompt) {
+                    fileInputPrompt.style.display = 'block';
+                }
+                filePreview.innerHTML = `<p>No file selected</p>`;
             }
+        });
+        
+        // Handle form submission and conversion process
+        conversionForm.addEventListener('submit', function(e) {
+            // Show loading spinner
+            loadingContainer.classList.remove('hidden');
+            convertBtn.disabled = true;
+            
+            // Set a timeout to show success message after conversion
+            // This is needed because the browser will start downloading the file
+            // and we need to update the UI to reflect that
+            setTimeout(function() {
+                // Check if file is still converting (for large files)
+                if (loadingContainer.classList.contains('hidden')) {
+                    return; // Already handled
+                }
+                
+                // Update loading text first
+                loadingText.textContent = "Download starting...";
+                
+                // After a short delay, show success message
+                setTimeout(function() {
+                    loadingContainer.classList.add('hidden');
+                    successMessage.classList.remove('hidden');
+                }, 1500);
+            }, 3000); // Wait for 3 seconds before showing success message
+        });
+        
+        // Reset button functionality
+        resetBtn.addEventListener('click', function() {
+            // Reset the form
+            conversionForm.reset();
+            
+            // Reset UI state
+            successMessage.classList.add('hidden');
+            convertBtn.disabled = false;
+            
+            // Reset file preview
+            const filePreview = document.getElementById('file-preview');
+            filePreview.innerHTML = `<p>No file selected</p>`;
+            
+            // Show the file input prompt
+            const fileInputPrompt = document.querySelector('.file-input-prompt');
+            if (fileInputPrompt) {
+                fileInputPrompt.style.display = 'block';
+            }
+        });
+        
+        // Handle iframe download completion
+        function handleDownloadComplete() {
+            loadingContainer.classList.add('hidden');
+            successMessage.classList.remove('hidden');
+        }
+        
+        // Create a hidden iframe to detect download completion
+        const downloadFrame = document.createElement('iframe');
+        downloadFrame.style.display = 'none';
+        downloadFrame.name = 'download-frame';
+        document.body.appendChild(downloadFrame);
+        
+        // Update the form to target the iframe
+        conversionForm.target = 'download-frame';
+        
+        // Listen for iframe load events
+        downloadFrame.addEventListener('load', function() {
+            // This will fire when the iframe loads, which happens after the download starts
+            setTimeout(handleDownloadComplete, 1000);
         });
     </script>
 </body>
