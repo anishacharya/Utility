@@ -49,7 +49,7 @@ python app.py
 
 Then open your browser and navigate to:
 ```
-http://localhost:5000
+http://localhost:8080
 ```
 
 The web interface allows you to:
